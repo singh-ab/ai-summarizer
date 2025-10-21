@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Text Summarizer</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>🤖 AI Text Summarizer</h1>
+        <p class="subtitle">Powered by Chrome's Built-in AI</p>
+      </header>
+
+      <!-- API Status -->
+      <div id="apiStatus" class="status-box">
+        <span class="status-indicator">●</span>
+        <span id="statusText">Checking AI availability...</span>
+      </div>
+
+      <!-- Configuration Options -->
+      <div class="options-section">
+        <div class="option-group">
+          <label for="summaryType">Summary Type:</label>
+          <select id="summaryType">
+            <option value="key-points">Key Points</option>
+            <option value="tl;dr">TL;DR</option>
+            <option value="teaser">Teaser</option>
+            <option value="headline">Headline</option>
+          </select>
+        </div>
+
+        <div class="option-group">
+          <label for="summaryLength">Length:</label>
+          <select id="summaryLength">
+            <option value="short">Short</option>
+            <option value="medium" selected>Medium</option>
+            <option value="long">Long</option>
+          </select>
+        </div>
+
+        <div class="option-group">
+          <label for="summaryFormat">Format:</label>
+          <select id="summaryFormat">
+            <option value="markdown" selected>Markdown</option>
+            <option value="plain-text">Plain Text</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="button-group">
+        <button id="summarizePage" class="btn btn-primary">
+          📄 Summarize Current Page
+        </button>
+        <button id="summarizeSelection" class="btn btn-secondary">
+          ✨ Summarize Selected Text
+        </button>
+      </div>
+
+      <!-- Text Input Area -->
+      <div class="input-section">
+        <label for="textInput">Or paste text to summarize:</label>
+        <textarea
+          id="textInput"
+          placeholder="Paste your text here..."
+          rows="6"
+        ></textarea>
+        <button id="summarizeInput" class="btn btn-primary">
+          🚀 Summarize Text
+        </button>
+      </div>
+
+      <!-- Progress Indicator -->
+      <div
+        id="progressContainer"
+        class="progress-container"
+        style="display: none"
+      >
+        <div class="progress-bar">
+          <div id="progressBar" class="progress-fill"></div>
+        </div>
+        <p id="progressText" class="progress-text">Processing...</p>
+      </div>
+
+      <!-- Summary Output -->
+      <div
+        id="summaryContainer"
+        class="summary-container"
+        style="display: none"
+      >
+        <h3>Summary:</h3>
+        <div id="summaryOutput" class="summary-output"></div>
+        <button id="copySummary" class="btn btn-small">📋 Copy Summary</button>
+      </div>
+
+      <!-- Error Display -->
+      <div id="errorContainer" class="error-container" style="display: none">
+        <h3>⚠️ Error:</h3>
+        <p id="errorText"></p>
+      </div>
+
+      <!-- Instructions -->
+      <div class="info-section">
+        <details>
+          <summary>ℹ️ How to use</summary>
+          <ul>
+            <li>Select text on any webpage and right-click to summarize</li>
+            <li>Click "Summarize Current Page" to summarize visible content</li>
+            <li>Paste text directly into the text area</li>
+            <li>Choose your preferred summary type, length, and format</li>
+          </ul>
+          <p class="note">
+            <strong>Note:</strong> This extension requires Chrome 138+ with
+            Gemini Nano enabled. The AI model may download on first use (~22GB
+            storage required).
+          </p>
+        </details>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
