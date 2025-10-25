@@ -224,18 +224,19 @@ async function showSummaryModal(text) {
     .querySelector(".ai-summarizer-overlay")
     .addEventListener("click", closeModal);
 
-  // Generate summary
+  // Generate comprehensive analysis
   try {
-    const summary = await generateSummary(text);
+    const analysis = await generateAnalysis(text);
     const body = modal.querySelector(".ai-summarizer-body");
-    body.innerHTML = `<div class="ai-summarizer-summary">${summary}</div>`;
+    body.innerHTML = createAnalysisHTML(analysis);
 
-    // Add copy functionality
+    // Add copy functionality for summary
     modal
       .querySelector(".ai-summarizer-copy")
       .addEventListener("click", async () => {
         try {
-          await navigator.clipboard.writeText(summary);
+          const summaryText = analysis.summary || analysis.analysis;
+          await navigator.clipboard.writeText(summaryText);
           const btn = modal.querySelector(".ai-summarizer-copy");
           const originalText = btn.textContent;
           btn.textContent = "✓ Copied!";
@@ -244,13 +245,41 @@ async function showSummaryModal(text) {
           console.error("Failed to copy:", error);
         }
       });
+
+    // Add query functionality
+    addQueryFunctionality(modal, analysis);
   } catch (error) {
     const body = modal.querySelector(".ai-summarizer-body");
-    body.innerHTML = `<div class="ai-summarizer-error">Failed to generate summary: ${error.message}</div>`;
+    body.innerHTML = `<div class="ai-summarizer-error">Failed to generate analysis: ${error.message}</div>`;
   }
 }
 
-// Generate summary using the Summarizer API
+// Generate comprehensive analysis using multiple Chrome APIs
+async function generateAnalysis(text) {
+  try {
+    console.log("=== Content Script: Generate Analysis ===");
+    console.log("Text length:", text.length);
+
+    // Send message to background script to handle comprehensive analysis
+    const response = await chrome.runtime.sendMessage({
+      action: "analyzeText",
+      text: text,
+      context: "Selected text from webpage"
+    });
+
+    if (response && response.success) {
+      return response.analysis;
+    } else {
+      throw new Error(response?.error || "Failed to generate analysis");
+    }
+  } catch (error) {
+    console.error("Analysis generation error:", error);
+    console.error("Error stack:", error.stack);
+    throw error;
+  }
+}
+
+// Generate summary using the Summarizer API (legacy function for compatibility)
 async function generateSummary(text) {
   try {
     console.log("=== Content Script: Generate Summary ===");
@@ -280,7 +309,7 @@ async function generateSummary(text) {
   }
 }
 
-// Add style for slideOut animation
+// Add style for slideOut animation and analysis components
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes slideOut {
@@ -292,6 +321,182 @@ styleSheet.textContent = `
       opacity: 0;
       transform: translate(-50%, -48%);
     }
+  }
+  
+  /* Analysis Styles */
+  .analysis-container {
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  
+  .analysis-summary, .danger-analysis, .translations, .query-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    border-radius: 8px;
+    background: #f8f9fa;
+  }
+  
+  .analysis-summary h4, .danger-analysis h4, .translations h4, .query-section h4 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #202124;
+  }
+  
+  .summary-content {
+    line-height: 1.6;
+    color: #202124;
+  }
+  
+  /* Danger Points Styles */
+  .danger-points {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .danger-point {
+    padding: 12px;
+    border-radius: 6px;
+    border-left: 4px solid;
+  }
+  
+  .danger-point.danger-critical {
+    background: #fce8e6;
+    border-left-color: #d93025;
+  }
+  
+  .danger-point.danger-high {
+    background: #fef7e0;
+    border-left-color: #fbbc04;
+  }
+  
+  .danger-point.danger-medium {
+    background: #e8f0fe;
+    border-left-color: #4285f4;
+  }
+  
+  .danger-point.danger-low {
+    background: #e8f5e9;
+    border-left-color: #34a853;
+  }
+  
+  .danger-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  
+  .danger-rating {
+    background: #202124;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 12px;
+  }
+  
+  .danger-title {
+    font-weight: 600;
+    color: #202124;
+  }
+  
+  .danger-description {
+    font-size: 14px;
+    color: #5f6368;
+    line-height: 1.5;
+  }
+  
+  /* Translation Styles */
+  .translation-tabs {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+  }
+  
+  .translation-tab {
+    padding: 6px 12px;
+    border: 1px solid #dadce0;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+  }
+  
+  .translation-tab:hover {
+    background: #f1f3f4;
+  }
+  
+  .translation-tab.active {
+    background: #4285f4;
+    color: white;
+    border-color: #4285f4;
+  }
+  
+  .translation-text {
+    line-height: 1.6;
+    color: #202124;
+  }
+  
+  /* Query Styles */
+  .query-input-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+  
+  .query-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #dadce0;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  
+  .query-input:focus {
+    outline: none;
+    border-color: #4285f4;
+  }
+  
+  .query-submit {
+    padding: 8px 16px;
+    background: #4285f4;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  
+  .query-submit:hover {
+    background: #3367d6;
+  }
+  
+  .query-response {
+    padding: 12px;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #dadce0;
+  }
+  
+  .query-answer {
+    color: #202124;
+    line-height: 1.6;
+  }
+  
+  .query-loading {
+    color: #5f6368;
+    font-style: italic;
+  }
+  
+  .query-error {
+    color: #d93025;
+    background: #fce8e6;
+    padding: 8px;
+    border-radius: 4px;
   }
 `;
 document.head.appendChild(styleSheet);
@@ -468,6 +673,174 @@ function showErrorModal(message) {
   modal
     .querySelector(".ai-summarizer-overlay")
     .addEventListener("click", closeModal);
+}
+
+// Create HTML for analysis results
+function createAnalysisHTML(analysis) {
+  let html = `
+    <div class="analysis-container">
+      <div class="analysis-summary">
+        <h4>📋 Summary</h4>
+        <div class="summary-content">${analysis.summary || analysis.analysis}</div>
+      </div>
+  `;
+
+  // Add danger ratings if available
+  if (analysis.dangerPoints && analysis.dangerPoints.length > 0) {
+    html += `
+      <div class="danger-analysis">
+        <h4>⚠️ Critical Points (Danger Rating)</h4>
+        <div class="danger-points">
+    `;
+    
+    analysis.dangerPoints.forEach((point, index) => {
+      const dangerClass = getDangerClass(point.rating);
+      html += `
+        <div class="danger-point ${dangerClass}">
+          <div class="danger-header">
+            <span class="danger-rating">${point.rating}/10</span>
+            <span class="danger-title">${point.title}</span>
+          </div>
+          <div class="danger-description">${point.description}</div>
+        </div>
+      `;
+    });
+    
+    html += `
+        </div>
+      </div>
+    `;
+  }
+
+  // Add translations if available
+  if (analysis.translations && Object.keys(analysis.translations).length > 0) {
+    html += `
+      <div class="translations">
+        <h4>🌍 Translations</h4>
+        <div class="translation-tabs">
+    `;
+    
+    Object.entries(analysis.translations).forEach(([lang, translation]) => {
+      html += `
+        <button class="translation-tab" data-lang="${lang}">${getLanguageName(lang)}</button>
+      `;
+    });
+    
+    html += `
+        </div>
+        <div class="translation-content">
+    `;
+    
+    Object.entries(analysis.translations).forEach(([lang, translation]) => {
+      html += `
+        <div class="translation-panel" data-lang="${lang}" style="display: none;">
+          <div class="translation-text">${translation}</div>
+        </div>
+      `;
+    });
+    
+    html += `
+        </div>
+      </div>
+    `;
+  }
+
+  // Add query section
+  html += `
+      <div class="query-section">
+        <h4>❓ Ask Questions</h4>
+        <div class="query-input-container">
+          <input type="text" class="query-input" placeholder="Ask about this content..." />
+          <button class="query-submit">Ask</button>
+        </div>
+        <div class="query-response" style="display: none;"></div>
+      </div>
+    </div>
+  `;
+
+  return html;
+}
+
+// Get danger class based on rating
+function getDangerClass(rating) {
+  if (rating >= 8) return "danger-critical";
+  if (rating >= 6) return "danger-high";
+  if (rating >= 4) return "danger-medium";
+  return "danger-low";
+}
+
+// Get language name from code
+function getLanguageName(code) {
+  const languages = {
+    'es': 'Spanish',
+    'fr': 'French',
+    'de': 'German',
+    'it': 'Italian',
+    'pt': 'Portuguese',
+    'ru': 'Russian',
+    'ja': 'Japanese',
+    'ko': 'Korean',
+    'zh': 'Chinese',
+    'ar': 'Arabic',
+    'hi': 'Hindi'
+  };
+  return languages[code] || code.toUpperCase();
+}
+
+// Add query functionality
+function addQueryFunctionality(modal, analysis) {
+  const queryInput = modal.querySelector(".query-input");
+  const querySubmit = modal.querySelector(".query-submit");
+  const queryResponse = modal.querySelector(".query-response");
+
+  querySubmit.addEventListener("click", async () => {
+    const question = queryInput.value.trim();
+    if (!question) return;
+
+    queryResponse.style.display = "block";
+    queryResponse.innerHTML = "<div class='query-loading'>Generating response...</div>";
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: "answerQuery",
+        question: question,
+        context: analysis.summary || analysis.analysis,
+        originalText: analysis.originalText
+      });
+
+      if (response && response.success) {
+        queryResponse.innerHTML = `<div class="query-answer">${response.answer}</div>`;
+      } else {
+        queryResponse.innerHTML = `<div class="query-error">Failed to generate response: ${response?.error || 'Unknown error'}</div>`;
+      }
+    } catch (error) {
+      queryResponse.innerHTML = `<div class="query-error">Error: ${error.message}</div>`;
+    }
+  });
+
+  // Add translation tab functionality
+  const translationTabs = modal.querySelectorAll(".translation-tab");
+  const translationPanels = modal.querySelectorAll(".translation-panel");
+
+  translationTabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      const lang = tab.dataset.lang;
+      
+      // Update active tab
+      translationTabs.forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      
+      // Show corresponding panel
+      translationPanels.forEach(panel => {
+        panel.style.display = panel.dataset.lang === lang ? "block" : "none";
+      });
+    });
+  });
+
+  // Activate first translation tab
+  if (translationTabs.length > 0) {
+    translationTabs[0].click();
+  }
 }
 
 console.log("AI Text Summarizer content script loaded");
