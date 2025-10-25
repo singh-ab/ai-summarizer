@@ -35,7 +35,7 @@ async function initialize() {
     console.log("typeof Summarizer:", typeof self.Summarizer);
 
     if (!("Summarizer" in self)) {
-      console.error("Summarizer API is not available");
+      console.error("Summarizer API is not available in popup context");
       console.log(
         "Available globals:",
         Object.keys(self).filter(
@@ -43,8 +43,31 @@ async function initialize() {
             k.includes("AI") || k.includes("ai") || k.includes("Summarizer")
         )
       );
+      
+      // Try to use background script as fallback
+      console.log("Attempting to use background script for summarization...");
+      updateStatus("loading", "Checking background script availability...");
+      
+      try {
+        // Test if background script can handle summarization
+        const testResponse = await chrome.runtime.sendMessage({
+          action: "testSummarizer"
+        });
+        
+        if (testResponse && testResponse.available) {
+          console.log("Background script can handle summarization");
+          updateStatus("ready", "Using background script for AI");
+          isApiAvailable = true;
+          disableButtons(false);
+          loadPreferences();
+          return;
+        }
+      } catch (bgError) {
+        console.error("Background script test failed:", bgError);
+      }
+      
       showError(
-        "Summarizer API is not available in this browser. Please ensure you are using Chrome 138+ with 'Summarizer API' flag enabled in chrome://flags"
+        "Summarizer API is not available. Please ensure you are using Chrome 138+ with 'Summarizer API' flag enabled in chrome://flags"
       );
       updateStatus("unavailable", "API not available");
       disableButtons(true);
@@ -182,7 +205,53 @@ async function createSummarizer() {
   }
 }
 
-// Summarize text
+// Analyze text comprehensively
+async function analyzeText(text, context = "") {
+  console.log("=== Analyze Text Called ===");
+  console.log("Text length:", text?.length || 0);
+  console.log("Context:", context);
+
+  if (!text || text.trim().length === 0) {
+    console.warn("No text provided");
+    showError("No text to analyze. Please provide some text.");
+    return;
+  }
+
+  hideError();
+  hideSummary();
+  showProgress("Analyzing content for risks and generating summary...");
+  disableButtons(true);
+
+  try {
+    // Use background script for comprehensive analysis
+    console.log("Using background script for comprehensive analysis");
+    const response = await chrome.runtime.sendMessage({
+      action: "analyzeText",
+      text: text,
+      context: context
+    });
+
+    if (response && response.success) {
+      hideProgress();
+      showAnalysisResults(response.analysis);
+      disableButtons(false);
+      return;
+    } else {
+      throw new Error(response?.error || "Failed to generate analysis");
+    }
+  } catch (error) {
+    console.error("Analysis error:", error);
+    console.error("Error name:", error.name);
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
+
+    hideProgress();
+    showDetailedError(error, "Failed to analyze text");
+    disableButtons(false);
+  }
+}
+
+// Summarize text (legacy function for compatibility)
 async function summarizeText(text, context = "") {
   console.log("=== Summarize Text Called ===");
   console.log("Text length:", text?.length || 0);
@@ -200,6 +269,26 @@ async function summarizeText(text, context = "") {
   disableButtons(true);
 
   try {
+    // Check if we can access Summarizer API directly in popup
+    if (!("Summarizer" in self)) {
+      console.log("Summarizer API not available in popup, using background script");
+      // Use background script for summarization
+      const response = await chrome.runtime.sendMessage({
+        action: "summarizeText",
+        text: text,
+        context: context
+      });
+
+      if (response && response.success) {
+        hideProgress();
+        showSummary(response.summary);
+        disableButtons(false);
+        return;
+      } else {
+        throw new Error(response?.error || "Failed to generate summary");
+      }
+    }
+
     // Create or reuse summarizer
     if (!summarizer) {
       console.log("No existing summarizer, creating new one...");
@@ -249,7 +338,7 @@ async function summarizeText(text, context = "") {
     console.error("Error stack:", error.stack);
 
     hideProgress();
-    showError(`Failed to summarize: ${error.message}`);
+    showDetailedError(error, "Failed to summarize text");
     disableButtons(false);
 
     // Reset summarizer on error
@@ -287,14 +376,202 @@ function hideSummary() {
   elements.summaryOutput.textContent = "";
 }
 
+function showAnalysisResults(analysis) {
+  elements.summaryContainer.style.display = "block";
+  
+  let html = `
+    <div class="analysis-results">
+      <div class="summary-section">
+        <h3>📋 Summary</h3>
+        <div class="summary-text">${analysis.summary || analysis.analysis}</div>
+      </div>
+  `;
+
+  // Add danger points if available
+  if (analysis.dangerPoints && analysis.dangerPoints.length > 0) {
+    html += `
+      <div class="danger-section">
+        <h3>⚠️ Critical Points (Danger Rating)</h3>
+        <div class="danger-list">
+    `;
+    
+    analysis.dangerPoints.forEach(point => {
+      const dangerClass = getDangerClass(point.rating);
+      html += `
+        <div class="danger-item ${dangerClass}">
+          <div class="danger-header">
+            <span class="danger-rating">${point.rating}/10</span>
+            <span class="danger-title">${point.title}</span>
+          </div>
+          <div class="danger-description">${point.description}</div>
+        </div>
+      `;
+    });
+    
+    html += `
+        </div>
+      </div>
+    `;
+  }
+
+  // Add translations if available
+  if (analysis.translations && Object.keys(analysis.translations).length > 0) {
+    html += `
+      <div class="translations-section">
+        <h3>🌍 Translations</h3>
+        <div class="translation-tabs">
+    `;
+    
+    Object.entries(analysis.translations).forEach(([lang, translation]) => {
+      html += `
+        <button class="translation-tab" data-lang="${lang}">${getLanguageName(lang)}</button>
+      `;
+    });
+    
+    html += `
+        </div>
+        <div class="translation-content">
+    `;
+    
+    Object.entries(analysis.translations).forEach(([lang, translation]) => {
+      html += `
+        <div class="translation-panel" data-lang="${lang}" style="display: none;">
+          <div class="translation-text">${translation}</div>
+        </div>
+      `;
+    });
+    
+    html += `
+        </div>
+      </div>
+    `;
+  }
+
+  html += `
+      <div class="query-section">
+        <h3>❓ Ask Questions</h3>
+        <div class="query-input-container">
+          <input type="text" class="query-input" placeholder="Ask about this content..." />
+          <button class="query-submit">Ask</button>
+        </div>
+        <div class="query-response" style="display: none;"></div>
+      </div>
+    </div>
+  `;
+
+  elements.summaryOutput.innerHTML = html;
+
+  // Add event listeners for new functionality
+  addAnalysisEventListeners(analysis);
+}
+
+function getDangerClass(rating) {
+  if (rating >= 8) return "danger-critical";
+  if (rating >= 6) return "danger-high";
+  if (rating >= 4) return "danger-medium";
+  return "danger-low";
+}
+
+function getLanguageName(code) {
+  const languages = {
+    'es': 'Spanish', 'fr': 'French', 'de': 'German', 'it': 'Italian',
+    'pt': 'Portuguese', 'ru': 'Russian', 'ja': 'Japanese', 'ko': 'Korean',
+    'zh': 'Chinese', 'ar': 'Arabic', 'hi': 'Hindi'
+  };
+  return languages[code] || code.toUpperCase();
+}
+
+function addAnalysisEventListeners(analysis) {
+  // Translation tabs
+  const translationTabs = document.querySelectorAll(".translation-tab");
+  const translationPanels = document.querySelectorAll(".translation-panel");
+
+  translationTabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      const lang = tab.dataset.lang;
+      
+      // Update active tab
+      translationTabs.forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      
+      // Show corresponding panel
+      translationPanels.forEach(panel => {
+        panel.style.display = panel.dataset.lang === lang ? "block" : "none";
+      });
+    });
+  });
+
+  // Query functionality
+  const queryInput = document.querySelector(".query-input");
+  const querySubmit = document.querySelector(".query-submit");
+  const queryResponse = document.querySelector(".query-response");
+
+  if (querySubmit) {
+    querySubmit.addEventListener("click", async () => {
+      const question = queryInput.value.trim();
+      if (!question) return;
+
+      queryResponse.style.display = "block";
+      queryResponse.innerHTML = "<div class='query-loading'>Generating response...</div>";
+
+      try {
+        const response = await chrome.runtime.sendMessage({
+          action: "answerQuery",
+          question: question,
+          context: analysis.summary || analysis.analysis,
+          originalText: analysis.originalText
+        });
+
+        if (response && response.success) {
+          queryResponse.innerHTML = `<div class="query-answer">${response.answer}</div>`;
+        } else {
+          queryResponse.innerHTML = `<div class="query-error">Failed to generate response: ${response?.error || 'Unknown error'}</div>`;
+        }
+      } catch (error) {
+        queryResponse.innerHTML = `<div class="query-error">Error: ${error.message}</div>`;
+      }
+    });
+  }
+
+  // Activate first translation tab
+  if (translationTabs.length > 0) {
+    translationTabs[0].click();
+  }
+}
+
 function showError(message) {
   elements.errorContainer.style.display = "block";
   elements.errorText.textContent = message;
+  
+  // Auto-hide error after 10 seconds
+  setTimeout(() => {
+    hideError();
+  }, 10000);
 }
 
 function hideError() {
   elements.errorContainer.style.display = "none";
   elements.errorText.textContent = "";
+}
+
+function showDetailedError(error, context = "") {
+  console.error("Detailed error:", error);
+  console.error("Error context:", context);
+  
+  let errorMessage = "An error occurred";
+  
+  if (error.message) {
+    errorMessage = error.message;
+  } else if (typeof error === "string") {
+    errorMessage = error;
+  }
+  
+  // Add context if provided
+  if (context) {
+    errorMessage = `${context}: ${errorMessage}`;
+  }
+  
+  showError(errorMessage);
 }
 
 function showInfo(message) {
@@ -315,6 +592,11 @@ elements.summarizePage.addEventListener("click", async () => {
       active: true,
       currentWindow: true,
     });
+
+    if (!tab) {
+      showError("No active tab found. Please try again.");
+      return;
+    }
 
     // Inject content script to get page text
     const results = await chrome.scripting.executeScript({
@@ -338,13 +620,17 @@ elements.summarizePage.addEventListener("click", async () => {
 
     if (results && results[0] && results[0].result) {
       const pageText = results[0].result;
-      await summarizeText(pageText, "Article or webpage content");
+      if (pageText && pageText.trim().length > 0) {
+        await analyzeText(pageText, "Article or webpage content");
+      } else {
+        showError("No text content found on this page.");
+      }
     } else {
       showError("Could not extract text from the current page.");
     }
   } catch (error) {
     console.error("Error getting page content:", error);
-    showError(`Failed to get page content: ${error.message}`);
+    showDetailedError(error, "Failed to get page content");
   }
 });
 
@@ -355,6 +641,11 @@ elements.summarizeSelection.addEventListener("click", async () => {
       currentWindow: true,
     });
 
+    if (!tab) {
+      showError("No active tab found. Please try again.");
+      return;
+    }
+
     // Get selected text from the page
     const results = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -363,28 +654,42 @@ elements.summarizeSelection.addEventListener("click", async () => {
 
     if (results && results[0] && results[0].result) {
       const selectedText = results[0].result;
-      if (selectedText.trim()) {
-        await summarizeText(selectedText, "Selected text");
+      if (selectedText && selectedText.trim().length > 0) {
+        await analyzeText(selectedText, "Selected text");
       } else {
-        showError("No text is currently selected on the page.");
+        showError("No text is currently selected on the page. Please select some text first.");
       }
     } else {
-      showError("Could not get selected text.");
+      showError("Could not get selected text. Please try again.");
     }
   } catch (error) {
     console.error("Error getting selection:", error);
-    showError(`Failed to get selected text: ${error.message}`);
+    showDetailedError(error, "Failed to get selected text");
   }
 });
 
 elements.summarizeInput.addEventListener("click", async () => {
-  const text = elements.textInput.value;
-  await summarizeText(text, "User provided text");
+  try {
+    const text = elements.textInput.value;
+    if (!text || text.trim().length === 0) {
+      showError("Please enter some text to summarize.");
+      return;
+    }
+    await analyzeText(text, "User provided text");
+  } catch (error) {
+    console.error("Error in summarizeInput:", error);
+    showDetailedError(error, "Failed to summarize input text");
+  }
 });
 
 elements.copySummary.addEventListener("click", async () => {
   try {
     const summary = elements.summaryOutput.textContent;
+    if (!summary || summary.trim().length === 0) {
+      showError("No summary to copy.");
+      return;
+    }
+    
     await navigator.clipboard.writeText(summary);
 
     // Visual feedback
@@ -395,7 +700,7 @@ elements.copySummary.addEventListener("click", async () => {
     }, 2000);
   } catch (error) {
     console.error("Failed to copy:", error);
-    showError("Failed to copy summary to clipboard.");
+    showDetailedError(error, "Failed to copy summary to clipboard");
   }
 });
 
