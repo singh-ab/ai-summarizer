@@ -251,18 +251,22 @@ async function generateSummary(text) {
     }
 
     console.log("Checking summarizer availability...");
-    const availability = await self.Summarizer.availability();
+    const availabilityOptions = {
+      outputLanguage: "en",
+    };
+    const availability = await self.Summarizer.availability(availabilityOptions);
     console.log("Availability:", availability);
     if (availability === "unavailable" || availability === "no") {
       throw new Error("Summarizer is not available on this device");
     }
 
     console.log("Creating summarizer...");
-    // Create summarizer
-    const summarizer = await self.Summarizer.create({
+    // Create summarizer with explicit options
+    const createOptions = {
       type: "key-points",
       length: "medium",
       format: "markdown",
+      outputLanguage: "en", // Required: specify output language for safety attestation
       monitor(m) {
         try {
           m.addEventListener("downloadprogress", (e) => {
@@ -274,7 +278,10 @@ async function generateSummary(text) {
           console.warn("Monitor setup failed:", err);
         }
       },
-    });
+    };
+    
+    console.log("Creating summarizer with options:", createOptions);
+    const summarizer = await self.Summarizer.create(createOptions);
 
     console.log("Summarizer created!");
 

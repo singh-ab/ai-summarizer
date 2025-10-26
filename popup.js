@@ -2,6 +2,13 @@
 const elements = {
   apiStatus: document.getElementById("apiStatus"),
   statusText: document.getElementById("statusText"),
+  modelStatus: document.getElementById("modelStatus"),
+  modelStatusIcon: document.getElementById("modelStatusIcon"),
+  modelStatusText: document.getElementById("modelStatusText"),
+  modelStatusDetail: document.getElementById("modelStatusDetail"),
+  modelProgressBar: document.getElementById("modelProgressBar"),
+  modelProgressFill: document.getElementById("modelProgressFill"),
+  refreshModelStatus: document.getElementById("refreshModelStatus"),
   summaryType: document.getElementById("summaryType"),
   summaryLength: document.getElementById("summaryLength"),
   summaryFormat: document.getElementById("summaryFormat"),
@@ -57,8 +64,19 @@ async function initialize() {
     // Summarizer.availability() returns string statuses like
     // 'unavailable' | 'readily' | 'downloadable' | 'downloading'
     // Some older docs/surfaces may use 'after-download' or 'no'. Handle broadly.
-    const availability = await self.Summarizer.availability();
+    // Pass the same options we'll use for create() to ensure compatibility
+    const availabilityOptions = {
+      outputLanguage: "en",
+    };
+
+    console.log("Checking availability with options:", availabilityOptions);
+    const availability = await self.Summarizer.availability(
+      availabilityOptions
+    );
     console.log("Summarizer availability:", availability);
+
+    // Update model status display
+    updateModelStatus(availability);
 
     const unavailableValues = new Set(["unavailable", "no"]);
     const needsDownloadValues = new Set([
@@ -112,6 +130,69 @@ function updateStatus(state, message) {
   elements.statusText.textContent = message;
 }
 
+// Update model download status
+function updateModelStatus(status, progress = null) {
+  elements.modelStatus.style.display = "block";
+  elements.modelStatus.className = "model-status-box";
+
+  switch (status) {
+    case "readily":
+      elements.modelStatus.classList.add("ready");
+      elements.modelStatusIcon.textContent = "✅";
+      elements.modelStatusText.textContent = "Model Ready";
+      elements.modelStatusDetail.textContent =
+        "Gemini Nano is downloaded and ready to use.";
+      elements.modelProgressBar.style.display = "none";
+      break;
+
+    case "downloading":
+      elements.modelStatus.classList.add("downloading");
+      elements.modelStatusIcon.textContent = "⬇️";
+      elements.modelStatusText.textContent = "Downloading Model";
+      elements.modelProgressBar.style.display = "block";
+      if (progress !== null) {
+        const percent = Math.round(progress * 100);
+        elements.modelProgressFill.style.width = `${percent}%`;
+        elements.modelStatusDetail.textContent = `Downloading Gemini Nano model: ${percent}%... This may take several minutes (~22GB).`;
+      } else {
+        elements.modelStatusDetail.textContent =
+          "Model download in progress... This may take several minutes (~22GB).";
+      }
+      break;
+
+    case "downloadable":
+    case "after-download":
+      elements.modelStatus.classList.add("needed");
+      elements.modelStatusIcon.textContent = "📦";
+      elements.modelStatusText.textContent = "Model Download Required";
+      elements.modelStatusDetail.textContent =
+        "The Gemini Nano model (~22GB) will download automatically when you first use the summarizer. Ensure you have sufficient storage and an unmetered connection.";
+      elements.modelProgressBar.style.display = "none";
+      break;
+
+    case "unavailable":
+    case "no":
+      elements.modelStatus.classList.add("error");
+      elements.modelStatusIcon.textContent = "❌";
+      elements.modelStatusText.textContent = "Model Unavailable";
+      elements.modelStatusDetail.textContent =
+        "Gemini Nano is not available on this device. Check system requirements: 22GB+ storage, GPU with 4GB+ VRAM (or 16GB+ RAM with 4+ CPU cores).";
+      elements.modelProgressBar.style.display = "none";
+      break;
+
+    default:
+      elements.modelStatusIcon.textContent = "ℹ️";
+      elements.modelStatusText.textContent = "Model Status Unknown";
+      elements.modelStatusDetail.textContent = `Current status: ${status}`;
+      elements.modelProgressBar.style.display = "none";
+  }
+}
+
+// Hide model status
+function hideModelStatus() {
+  elements.modelStatus.style.display = "none";
+}
+
 // Load user preferences from storage
 async function loadPreferences() {
   try {
@@ -156,23 +237,41 @@ async function createSummarizer() {
     };
 
     console.log("Summarizer options:", options);
-    // Provide monitor to reflect download progress in UI
-    summarizer = await self.Summarizer.create({
-      ...options,
+
+    // Create options object with required outputLanguage
+    const createOptions = {
+      type: options.type,
+      length: options.length,
+      format: options.format,
+      outputLanguage: "en", // Required: specify output language for safety attestation
       monitor(m) {
         try {
           m.addEventListener("downloadprogress", (e) => {
             const pct = Math.round((e.loaded || 0) * 100);
+            console.log(`Model download progress: ${pct}%`);
+
+            // Update both progress indicators
             elements.progressContainer.style.display = "block";
             elements.progressBar.style.width = `${pct}%`;
             elements.progressText.textContent = `Downloading model: ${pct}%`;
+
+            // Update model status box
+            updateModelStatus("downloading", e.loaded);
           });
         } catch (err) {
           console.warn("Monitor setup failed:", err);
         }
       },
-    });
+    };
+
+    console.log("Creating summarizer with options:", createOptions);
+
+    // Provide monitor to reflect download progress in UI
+    summarizer = await self.Summarizer.create(createOptions);
     console.log("Summarizer created successfully!");
+
+    // Update model status to ready after successful creation
+    updateModelStatus("readily");
 
     return summarizer;
   } catch (error) {
@@ -403,6 +502,43 @@ elements.copySummary.addEventListener("click", async () => {
 elements.summaryType.addEventListener("change", savePreferences);
 elements.summaryLength.addEventListener("change", savePreferences);
 elements.summaryFormat.addEventListener("change", savePreferences);
+
+// Refresh model status
+elements.refreshModelStatus.addEventListener("click", async () => {
+  try {
+    console.log("Refreshing model status...");
+    if (!("Summarizer" in self)) {
+      showError("Summarizer API is not available");
+      return;
+    }
+
+    const availabilityOptions = {
+      outputLanguage: "en",
+    };
+    const availability = await self.Summarizer.availability(
+      availabilityOptions
+    );
+    console.log("Current availability:", availability);
+    updateModelStatus(availability);
+
+    // Also update the main status
+    if (availability === "readily") {
+      updateStatus("ready", "AI is ready!");
+    } else if (availability === "downloading") {
+      updateStatus("loading", "Model downloading...");
+    } else if (
+      availability === "downloadable" ||
+      availability === "after-download"
+    ) {
+      updateStatus("loading", "Model download required");
+    } else {
+      updateStatus("unavailable", "Not available");
+    }
+  } catch (error) {
+    console.error("Failed to refresh model status:", error);
+    showError(`Failed to check model status: ${error.message}`);
+  }
+});
 
 // Cleanup on unload
 window.addEventListener("unload", () => {
