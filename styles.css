@@ -86,6 +86,89 @@ h1 {
   }
 }
 
+/* Model Status Box */
+.model-status-box {
+  padding: 14px;
+  border-radius: 8px;
+  background: #f8f9fa;
+  border: 2px solid #e0e0e0;
+  margin-bottom: 16px;
+  transition: all 0.3s ease;
+}
+
+.model-status-box.downloading {
+  background: #e8f0fe;
+  border-color: #1967d2;
+}
+
+.model-status-box.ready {
+  background: #e6f4ea;
+  border-color: #137333;
+}
+
+.model-status-box.needed {
+  background: #fef7e0;
+  border-color: #f9ab00;
+}
+
+.model-status-box.error {
+  background: #fce8e6;
+  border-color: #c5221f;
+}
+
+.model-status-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.model-status-header .btn-icon {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.model-status-header .btn-icon:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.model-status-header .btn-icon:active {
+  transform: rotate(180deg);
+  transition: transform 0.3s;
+}
+
+.model-status-detail {
+  font-size: 12px;
+  color: #5f6368;
+  margin: 4px 0 0 0;
+  line-height: 1.4;
+}
+
+.model-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 8px 0 4px 0;
+}
+
+.model-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #1967d2 0%, #4285f4 100%);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
 /* Options Section */
 .options-section {
   margin-bottom: 16px;
@@ -332,6 +415,17 @@ summary:hover {
   background-color: #fff3cd;
   border-radius: 4px;
   margin-top: 8px;
+  line-height: 1.4;
+}
+
+.note a {
+  color: var(--primary-color);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.note a:hover {
+  text-decoration: underline;
 }
 
 /* Scrollbar Styling */

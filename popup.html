@@ -19,6 +19,29 @@
         <span id="statusText">Checking AI availability...</span>
       </div>
 
+      <!-- Model Download Status -->
+      <div id="modelStatus" class="model-status-box" style="display: none">
+        <div class="model-status-header">
+          <span id="modelStatusIcon">📦</span>
+          <span id="modelStatusText">Model Status</span>
+          <button
+            id="refreshModelStatus"
+            class="btn-icon"
+            title="Refresh model status"
+          >
+            🔄
+          </button>
+        </div>
+        <div
+          id="modelProgressBar"
+          class="model-progress-bar"
+          style="display: none"
+        >
+          <div id="modelProgressFill" class="model-progress-fill"></div>
+        </div>
+        <p id="modelStatusDetail" class="model-status-detail"></p>
+      </div>
+
       <!-- Configuration Options -->
       <div class="options-section">
         <div class="option-group">
@@ -110,6 +133,7 @@
             <li>Click "Summarize Current Page" to summarize visible content</li>
             <li>Paste text directly into the text area</li>
             <li>Choose your preferred summary type, length, and format</li>
+            <li>Check model status in the "Model Status" box above</li>
           </ul>
           <p class="note">
             <strong>Note:</strong> This extension requires Chrome 138+ with
